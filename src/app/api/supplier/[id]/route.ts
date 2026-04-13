@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getDatabase } from '@/lib/db';
 import { authenticate } from '@/lib/auth';
 
-export async function GET(request: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const authHeader = request.headers.get('authorization');
     const user = authenticate(authHeader);
@@ -14,7 +14,7 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
       );
     }
 
-    const { id } = params;
+    const { id } = await params;
     const db = getDatabase();
     const supplier = db.prepare('SELECT * FROM supplier WHERE id = ?').get(id);
 
@@ -38,7 +38,7 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
   }
 }
 
-export async function PUT(request: NextRequest, { params }: { params: { id: string } }) {
+export async function PUT(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const authHeader = request.headers.get('authorization');
     const user = authenticate(authHeader);
@@ -50,7 +50,7 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
       );
     }
 
-    const { id } = params;
+    const { id } = await params;
     const body = await request.json();
     const { nama, kontak, alamat, keterangan } = body;
 
@@ -90,7 +90,7 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
   }
 }
 
-export async function DELETE(request: NextRequest, { params }: { params: { id: string } }) {
+export async function DELETE(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const authHeader = request.headers.get('authorization');
     const user = authenticate(authHeader);
@@ -102,7 +102,7 @@ export async function DELETE(request: NextRequest, { params }: { params: { id: s
       );
     }
 
-    const { id } = params;
+    const { id } = await params;
     const db = getDatabase();
 
     const existing = db.prepare('SELECT id FROM supplier WHERE id = ?').get(id);
