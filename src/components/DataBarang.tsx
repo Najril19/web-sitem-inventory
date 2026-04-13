@@ -60,9 +60,10 @@ export default function DataBarang() {
     if (editingItem) {
       setBarang(barang.map(item => item.id === editingItem.id ? { ...item, ...formData } : item));
     } else {
+      const { id, ...formDataWithoutId } = formData as Barang;
       const newItem = {
         id: Math.max(...barang.map(b => b.id)) + 1,
-        ...formData as Barang
+        ...formDataWithoutId
       };
       setBarang([...barang, newItem]);
     }

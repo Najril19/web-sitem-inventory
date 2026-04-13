@@ -54,9 +54,10 @@ export default function DataSupplier() {
     if (editingItem) {
       setSuppliers(suppliers.map(item => item.id === editingItem.id ? { ...item, ...formData } : item));
     } else {
+      const { id, ...formDataWithoutId } = formData as Supplier;
       const newItem = {
         id: Math.max(...suppliers.map(s => s.id)) + 1,
-        ...formData as Supplier
+        ...formDataWithoutId
       };
       setSuppliers([...suppliers, newItem]);
     }
