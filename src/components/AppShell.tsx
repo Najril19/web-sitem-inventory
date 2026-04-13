@@ -132,7 +132,7 @@ export default function AppShell() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-900 flex">
+    <div className="min-h-screen w-full bg-gray-900 flex overflow-hidden">
       {/* Sidebar - Desktop */}
       <motion.aside
         initial={{ x: -300 }}
@@ -265,7 +265,7 @@ export default function AppShell() {
       </AnimatePresence>
 
       {/* Main Content */}
-      <div className="flex-1 lg:ml-72">
+      <div className="flex-1 flex flex-col h-screen overflow-hidden lg:ml-72 w-full">
         {/* Top Bar */}
         <motion.header
           initial={{ y: -20, opacity: 0 }}
@@ -297,7 +297,7 @@ export default function AppShell() {
         </motion.header>
 
         {/* Page Content */}
-        <main className="p-4 sm:p-6 lg:p-8">
+        <main className="flex-1 overflow-y-auto overflow-x-hidden p-4 sm:p-6 lg:p-8 w-full">
           <AnimatePresence mode="wait">
             <motion.div
               key={currentPage}
