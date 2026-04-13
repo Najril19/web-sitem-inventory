@@ -1,10 +1,12 @@
 {
   "experimentalServices": {
     "frontend": {
-      "type": "web"
+      "type": "web",
+      "subdomain": "app"
     },
     "backend": {
-      "type": "web"
+      "type": "web",
+      "subdomain": "api"
     }
   }
 }
