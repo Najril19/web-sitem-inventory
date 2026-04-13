@@ -9,8 +9,7 @@
       "type": "web",
       "subdomain": "api",
       "entrypoint": "backend/dist/server.js",
-      "builder": "npx",
-      "runtime": "nodejs18.x"
+      "builder": "npx"
     }
   }
 }
