@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { motion } from 'motion/react';
 import { FileText, Download, Calendar, Filter, Package, TrendingUp, TrendingDown, Database } from 'lucide-react';
+import { InventoryDatePicker } from '@/components/InventoryDatePicker';
 
 type LaporanType = 'barang' | 'masuk' | 'keluar' | 'stok';
 
@@ -108,20 +109,18 @@ export default function Laporan() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-300 mb-2">Dari Tanggal</label>
-              <input
-                type="date"
+              <InventoryDatePicker
                 value={dateFrom}
-                onChange={(e) => setDateFrom(e.target.value)}
-                className="w-full px-4 py-2 border border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-gray-700 text-white"
+                onChange={setDateFrom}
+                accent="blue"
               />
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-300 mb-2">Sampai Tanggal</label>
-              <input
-                type="date"
+              <InventoryDatePicker
                 value={dateTo}
-                onChange={(e) => setDateTo(e.target.value)}
-                className="w-full px-4 py-2 border border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-gray-700 text-white"
+                onChange={setDateTo}
+                accent="blue"
               />
             </div>
           </div>

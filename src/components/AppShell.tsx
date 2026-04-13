@@ -37,12 +37,21 @@ export default function AppShell() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [currentPage, setCurrentPage] = useState<Page>('dashboard');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
 
-  const handleLogout = () => {
-    if (confirm('Yakin ingin logout?')) {
-      setIsLoggedIn(false);
-      setCurrentPage('dashboard');
-    }
+  const openLogoutDialog = () => {
+    setShowLogoutConfirm(true);
+  };
+
+  const confirmLogout = () => {
+    setIsLoggedIn(false);
+    setCurrentPage('dashboard');
+    setShowLogoutConfirm(false);
+    setIsSidebarOpen(false);
+  };
+
+  const cancelLogout = () => {
+    setShowLogoutConfirm(false);
   };
 
   if (!isLoggedIn) {
@@ -114,9 +123,10 @@ export default function AppShell() {
         {/* Logout Button */}
         <div className="p-4 border-t border-gray-700">
           <motion.button
+            type="button"
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.98 }}
-            onClick={handleLogout}
+            onClick={openLogoutDialog}
             className="w-full flex items-center gap-3 px-4 py-3 rounded-lg bg-red-500 hover:bg-red-600 text-white transition-all"
           >
             <LogOut className="w-5 h-5" />
@@ -187,7 +197,8 @@ export default function AppShell() {
               {/* Logout Button */}
               <div className="p-4 border-t border-gray-700">
                 <button
-                  onClick={handleLogout}
+                  type="button"
+                  onClick={openLogoutDialog}
                   className="w-full flex items-center gap-3 px-4 py-3 rounded-lg bg-red-500 hover:bg-red-600 text-white transition-all"
                 >
                   <LogOut className="w-5 h-5" />
@@ -246,6 +257,71 @@ export default function AppShell() {
           </AnimatePresence>
         </main>
       </div>
+
+      <AnimatePresence>
+        {showLogoutConfirm && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[100] flex items-center justify-center bg-black/65 p-4 backdrop-blur-sm"
+            role="presentation"
+            onClick={cancelLogout}
+          >
+            <motion.div
+              initial={{ opacity: 0, scale: 0.94, y: 12 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.94, y: 12 }}
+              transition={{ type: 'spring', stiffness: 380, damping: 28 }}
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="logout-dialog-title"
+              aria-describedby="logout-dialog-desc"
+              className="w-full max-w-md overflow-hidden rounded-2xl border border-gray-600 bg-gradient-to-b from-gray-800 to-gray-900 shadow-2xl shadow-black/80"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="h-1 w-full bg-gradient-to-r from-red-500 via-red-600 to-rose-600" />
+              <div className="p-6 sm:p-8">
+                <div className="mx-auto mb-5 flex size-14 items-center justify-center rounded-2xl bg-red-500/15 ring-1 ring-red-500/40">
+                  <LogOut className="size-7 text-red-400" strokeWidth={2} />
+                </div>
+                <h2
+                  id="logout-dialog-title"
+                  className="text-center text-xl font-bold text-white sm:text-2xl"
+                >
+                  Logout
+                </h2>
+                <p
+                  id="logout-dialog-desc"
+                  className="mt-3 text-center text-sm leading-relaxed text-gray-400 sm:text-base"
+                >
+                  Apakah Anda yakin ingin logout?
+                </p>
+                <div className="mt-8 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+                  <motion.button
+                    type="button"
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                    onClick={cancelLogout}
+                    className="w-full rounded-xl border border-gray-600 bg-gray-700/80 px-5 py-3 text-sm font-semibold text-white shadow-inner transition-colors hover:bg-gray-700 sm:w-auto"
+                  >
+                    No
+                  </motion.button>
+                  <motion.button
+                    type="button"
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                    onClick={confirmLogout}
+                    className="w-full rounded-xl bg-gradient-to-r from-red-500 to-red-600 px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-red-500/35 transition-shadow hover:shadow-xl sm:w-auto"
+                  >
+                    Yes
+                  </motion.button>
+                </div>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

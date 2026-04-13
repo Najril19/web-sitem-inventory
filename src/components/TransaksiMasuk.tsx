@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Plus, TrendingUp, Calendar, Package, Truck, ArrowDownCircle, CheckCircle, Clock } from 'lucide-react';
+import { Plus, TrendingUp, Calendar, Package, Truck, ArrowDownCircle, CheckCircle, Clock, PackagePlus } from 'lucide-react';
+import { InventoryDatePicker } from '@/components/InventoryDatePicker';
 
 interface TransaksiMasuk {
   id: number;
@@ -28,8 +29,8 @@ export default function TransaksiMasuk() {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     const newTransaksi = {
+      ...formData as TransaksiMasuk,
       id: Math.max(...transaksi.map(t => t.id)) + 1,
-      ...formData as TransaksiMasuk
     };
     setTransaksi([newTransaksi, ...transaksi]);
     setShowModal(false);
@@ -68,13 +69,13 @@ export default function TransaksiMasuk() {
         transition={{ delay: 0.1 }}
         className="bg-gradient-to-r from-emerald-500 to-emerald-600 rounded-xl shadow-lg shadow-emerald-500/30 p-6 text-white"
       >
-        <div className="flex items-center gap-4">
-          <div className="p-4 bg-white bg-opacity-20 rounded-lg">
-            <TrendingUp className="w-8 h-8" />
+        <div className="flex items-center gap-5">
+          <div className="flex size-16 shrink-0 items-center justify-center rounded-2xl bg-white shadow-lg shadow-black/15">
+            <PackagePlus className="size-9 text-emerald-600" strokeWidth={2.25} aria-hidden />
           </div>
-          <div>
-            <p className="text-emerald-100">Total Barang Masuk Bulan Ini</p>
-            <h2 className="text-4xl font-bold mt-1">{totalMasuk} Unit</h2>
+          <div className="min-w-0">
+            <p className="text-sm font-medium text-white/95 sm:text-base">Total Barang Masuk Bulan Ini</p>
+            <h2 className="mt-1 text-3xl font-bold tracking-tight sm:text-4xl">{totalMasuk} Unit</h2>
           </div>
         </div>
       </motion.div>
@@ -217,12 +218,10 @@ export default function TransaksiMasuk() {
                       <Calendar className="w-4 h-4 inline mr-1" />
                       Tanggal
                     </label>
-                    <input
-                      type="date"
+                    <InventoryDatePicker
                       value={formData.tanggal || ''}
-                      onChange={(e) => setFormData({ ...formData, tanggal: e.target.value })}
-                      className="w-full px-4 py-2 border border-gray-600 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 bg-gray-700 text-white"
-                      required
+                      onChange={(v) => setFormData({ ...formData, tanggal: v })}
+                      accent="emerald"
                     />
                   </div>
                   <div>

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Plus, TrendingDown, Calendar, Package, User, ArrowUpCircle, CheckCircle, Clock, ShoppingCart } from 'lucide-react';
+import { InventoryDatePicker } from '@/components/InventoryDatePicker';
 
 interface TransaksiKeluar {
   id: number;
@@ -28,8 +29,8 @@ export default function TransaksiKeluar() {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     const newTransaksi = {
+      ...formData as TransaksiKeluar,
       id: Math.max(...transaksi.map(t => t.id)) + 1,
-      ...formData as TransaksiKeluar
     };
     setTransaksi([newTransaksi, ...transaksi]);
     setShowModal(false);
@@ -68,13 +69,13 @@ export default function TransaksiKeluar() {
         transition={{ delay: 0.1 }}
         className="bg-gradient-to-r from-orange-500 to-orange-600 rounded-xl shadow-lg shadow-orange-500/30 p-6 text-white"
       >
-        <div className="flex items-center gap-4">
-          <div className="p-4 bg-white bg-opacity-20 rounded-lg">
-            <TrendingDown className="w-8 h-8" />
+        <div className="flex items-center gap-5">
+          <div className="flex size-16 shrink-0 items-center justify-center rounded-2xl bg-white shadow-lg shadow-black/15">
+            <ArrowUpCircle className="size-9 text-orange-600" strokeWidth={2.25} aria-hidden />
           </div>
-          <div>
-            <p className="text-orange-100">Total Barang Keluar Bulan Ini</p>
-            <h2 className="text-4xl font-bold mt-1">{totalKeluar} Unit</h2>
+          <div className="min-w-0">
+            <p className="text-sm font-medium text-white/95 sm:text-base">Total Barang Keluar Bulan Ini</p>
+            <h2 className="mt-1 text-3xl font-bold tracking-tight sm:text-4xl">{totalKeluar} Unit</h2>
           </div>
         </div>
       </motion.div>
@@ -217,12 +218,10 @@ export default function TransaksiKeluar() {
                       <Calendar className="w-4 h-4 inline mr-1" />
                       Tanggal
                     </label>
-                    <input
-                      type="date"
+                    <InventoryDatePicker
                       value={formData.tanggal || ''}
-                      onChange={(e) => setFormData({ ...formData, tanggal: e.target.value })}
-                      className="w-full px-4 py-2 border border-gray-600 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 bg-gray-700 text-white"
-                      required
+                      onChange={(v) => setFormData({ ...formData, tanggal: v })}
+                      accent="orange"
                     />
                   </div>
                   <div>

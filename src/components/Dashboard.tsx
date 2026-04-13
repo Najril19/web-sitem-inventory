@@ -1,6 +1,9 @@
+'use client';
+
+import { useEffect, useState } from 'react';
 import { motion } from 'motion/react';
 import { Package, TrendingUp, TrendingDown, Database, BarChart3, Calendar } from 'lucide-react';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
 const statsData = [
   { icon: Package, label: 'Total Data Barang', value: '247', color: 'from-blue-500 to-blue-600', bgColor: 'bg-blue-50', iconColor: 'text-blue-600' },
@@ -23,6 +26,15 @@ const topProducts = [
   { name: 'Koko Ethica Modern', stock: 115, brand: 'Ethica' },
   { name: 'Koko Shafira Elegant', stock: 98, brand: 'Shafira' },
 ];
+
+function RechartsClientOnly({ children }: { children: React.ReactNode }) {
+  const [ready, setReady] = useState(false);
+  useEffect(() => setReady(true), []);
+  if (!ready) {
+    return <div className="h-[250px] w-full rounded-lg bg-gray-900/50" aria-hidden />;
+  }
+  return <>{children}</>;
+}
 
 export default function Dashboard() {
   return (
@@ -81,18 +93,20 @@ export default function Dashboard() {
             <BarChart3 className="w-5 h-5 text-emerald-500" />
             <h2 className="text-xl font-semibold text-white">Statistik Transaksi Bulanan</h2>
           </div>
-          <ResponsiveContainer width="100%" height={250}>
-            <BarChart data={monthlyData}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
-              <XAxis dataKey="month" stroke="#9ca3af" />
-              <YAxis stroke="#9ca3af" />
-              <Tooltip
-                contentStyle={{ backgroundColor: '#1f2937', border: '1px solid #374151', borderRadius: '8px', color: '#fff' }}
-              />
-              <Bar dataKey="masuk" fill="#10b981" radius={[8, 8, 0, 0]} />
-              <Bar dataKey="keluar" fill="#f59e0b" radius={[8, 8, 0, 0]} />
-            </BarChart>
-          </ResponsiveContainer>
+          <RechartsClientOnly>
+            <ResponsiveContainer width="100%" height={250}>
+              <BarChart data={monthlyData}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
+                <XAxis dataKey="month" stroke="#9ca3af" />
+                <YAxis stroke="#9ca3af" />
+                <Tooltip
+                  contentStyle={{ backgroundColor: '#1f2937', border: '1px solid #374151', borderRadius: '8px', color: '#fff' }}
+                />
+                <Bar dataKey="masuk" fill="#10b981" radius={[8, 8, 0, 0]} />
+                <Bar dataKey="keluar" fill="#f59e0b" radius={[8, 8, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </RechartsClientOnly>
           <div className="flex justify-center gap-6 mt-4">
             <div className="flex items-center gap-2">
               <div className="w-3 h-3 bg-emerald-500 rounded-full shadow-lg shadow-emerald-500/50"></div>
