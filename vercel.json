@@ -7,7 +7,8 @@
     },
     "backend": {
       "type": "web",
-      "subdomain": "api"
+      "subdomain": "api",
+      "entrypoint": "backend/dist/server.js"
     }
   }
 }
