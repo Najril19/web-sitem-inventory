@@ -1,7 +1,7 @@
 {
   "experimentalServices": {
     "frontend": {
-      "type": "nextjs"
+      "type": "web"
     },
     "backend": {
       "type": "express",
