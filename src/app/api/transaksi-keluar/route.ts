@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getDatabase } from '@/lib/db';
+import { supabase } from '@/lib/db';
 import { authenticate } from '@/lib/auth';
 
 export async function GET(request: NextRequest) {
@@ -14,22 +14,26 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const db = getDatabase();
-    const transaksi = db.prepare(`
-      SELECT 
-        tk.id,
-        tk.tanggal,
-        tk.jumlah,
-        tk.tujuan,
-        tk.keterangan,
-        tk.created_at,
-        b.id as barang_id,
-        b.nama_barang,
-        b.kode_barang
-      FROM transaksi_keluar tk
-      JOIN barang b ON tk.barang_id = b.id
-      ORDER BY tk.tanggal DESC, tk.created_at DESC
-    `).all();
+    const { data: transaksi, error } = await supabase
+      .from('transaksi_keluar')
+      .select(`
+        id,
+        tanggal,
+        jumlah,
+        tujuan,
+        keterangan,
+        created_at,
+        barang:barang_id(id, nama_barang, kode_barang)
+      `)
+      .order('tanggal', { ascending: false })
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      return NextResponse.json(
+        { error: 'Gagal mengambil data transaksi keluar' },
+        { status: 500 }
+      );
+    }
 
     return NextResponse.json({
       success: true,
@@ -66,10 +70,13 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const db = getDatabase();
+    const { data: barang, error: barangError } = await supabase
+      .from('barang')
+      .select('id, stok')
+      .eq('id', barang_id)
+      .single();
 
-    const barang = db.prepare('SELECT id, stok FROM barang WHERE id = ?').get(barang_id) as any;
-    if (!barang) {
+    if (barangError || !barang) {
       return NextResponse.json(
         { error: 'Barang tidak ditemukan' },
         { status: 404 }
@@ -83,22 +90,31 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const result = db.prepare(`
-      INSERT INTO transaksi_keluar (tanggal, barang_id, jumlah, tujuan, keterangan, created_by)
-      VALUES (?, ?, ?, ?, ?, ?)
-    `).run(tanggal, barang_id, jumlah, tujuan, keterangan || null, user.id);
+    const { data: newTransaksi, error: insertError } = await supabase
+      .from('transaksi_keluar')
+      .insert({
+        tanggal,
+        barang_id,
+        jumlah,
+        tujuan,
+        keterangan: keterangan || null,
+        created_by: user.id,
+      })
+      .select()
+      .single();
+
+    if (insertError) {
+      return NextResponse.json(
+        { error: 'Gagal menambah transaksi keluar' },
+        { status: 500 }
+      );
+    }
 
     const newStok = barang.stok - jumlah;
-    db.prepare('UPDATE barang SET stok = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?').run(newStok, barang_id);
-
-    const newTransaksi = db.prepare(`
-      SELECT 
-        tk.*,
-        b.nama_barang
-      FROM transaksi_keluar tk
-      JOIN barang b ON tk.barang_id = b.id
-      WHERE tk.id = ?
-    `).get(result.lastInsertRowid);
+    await supabase
+      .from('barang')
+      .update({ stok: newStok, updated_at: new Date().toISOString() })
+      .eq('id', barang_id);
 
     return NextResponse.json({
       success: true,

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getDatabase } from '@/lib/db';
+import { supabase } from '@/lib/db';
 import { authenticate } from '@/lib/auth';
 
 export async function GET(request: NextRequest) {
@@ -14,8 +14,17 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const db = getDatabase();
-    const barang = db.prepare('SELECT * FROM barang ORDER BY created_at DESC').all();
+    const { data: barang, error } = await supabase
+      .from('barang')
+      .select('*')
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      return NextResponse.json(
+        { error: 'Gagal mengambil data barang' },
+        { status: 500 }
+      );
+    }
 
     return NextResponse.json({
       success: true,
@@ -62,9 +71,12 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const db = getDatabase();
+    const { data: existing } = await supabase
+      .from('barang')
+      .select('id')
+      .eq('kode_barang', kode_barang)
+      .single();
 
-    const existing = db.prepare('SELECT id FROM barang WHERE kode_barang = ?').get(kode_barang);
     if (existing) {
       return NextResponse.json(
         { error: 'Kode barang sudah digunakan' },
@@ -72,22 +84,28 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const result = db.prepare(`
-      INSERT INTO barang (kode_barang, nama_barang, merk, kategori, stok, harga_beli, harga_jual, satuan, keterangan)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(
-      kode_barang,
-      nama_barang,
-      merk || null,
-      kategori || null,
-      stok || 0,
-      harga_beli || 0,
-      harga_jual || 0,
-      satuan || 'Unit',
-      keterangan || null
-    );
+    const { data: newBarang, error } = await supabase
+      .from('barang')
+      .insert({
+        kode_barang,
+        nama_barang,
+        merk: merk || null,
+        kategori: kategori || null,
+        stok: stok || 0,
+        harga_beli: harga_beli || 0,
+        harga_jual: harga_jual || 0,
+        satuan: satuan || 'Unit',
+        keterangan: keterangan || null,
+      })
+      .select()
+      .single();
 
-    const newBarang = db.prepare('SELECT * FROM barang WHERE id = ?').get(result.lastInsertRowid);
+    if (error) {
+      return NextResponse.json(
+        { error: 'Gagal menambah barang' },
+        { status: 500 }
+      );
+    }
 
     return NextResponse.json({
       success: true,

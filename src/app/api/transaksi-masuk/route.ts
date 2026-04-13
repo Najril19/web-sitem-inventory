@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getDatabase } from '@/lib/db';
+import { supabase } from '@/lib/db';
 import { authenticate } from '@/lib/auth';
 
 export async function GET(request: NextRequest) {
@@ -14,26 +14,28 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const db = getDatabase();
-    const transaksi = db.prepare(`
-      SELECT 
-        tm.id,
-        tm.tanggal,
-        tm.jumlah,
-        tm.harga_satuan,
-        tm.total_harga,
-        tm.keterangan,
-        tm.created_at,
-        b.id as barang_id,
-        b.nama_barang,
-        b.kode_barang,
-        s.id as supplier_id,
-        s.nama as supplier_nama
-      FROM transaksi_masuk tm
-      JOIN barang b ON tm.barang_id = b.id
-      JOIN supplier s ON tm.supplier_id = s.id
-      ORDER BY tm.tanggal DESC, tm.created_at DESC
-    `).all();
+    const { data: transaksi, error } = await supabase
+      .from('transaksi_masuk')
+      .select(`
+        id,
+        tanggal,
+        jumlah,
+        harga_satuan,
+        total_harga,
+        keterangan,
+        created_at,
+        barang:barang_id(id, nama_barang, kode_barang),
+        supplier:supplier_id(id, nama)
+      `)
+      .order('tanggal', { ascending: false })
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      return NextResponse.json(
+        { error: 'Gagal mengambil data transaksi masuk' },
+        { status: 500 }
+      );
+    }
 
     return NextResponse.json({
       success: true,
@@ -70,18 +72,26 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const db = getDatabase();
+    const { data: barang, error: barangError } = await supabase
+      .from('barang')
+      .select('id, stok')
+      .eq('id', barang_id)
+      .single();
 
-    const barang = db.prepare('SELECT id, stok FROM barang WHERE id = ?').get(barang_id) as any;
-    if (!barang) {
+    if (barangError || !barang) {
       return NextResponse.json(
         { error: 'Barang tidak ditemukan' },
         { status: 404 }
       );
     }
 
-    const supplier = db.prepare('SELECT id FROM supplier WHERE id = ?').get(supplier_id);
-    if (!supplier) {
+    const { data: supplier, error: supplierError } = await supabase
+      .from('supplier')
+      .select('id')
+      .eq('id', supplier_id)
+      .single();
+
+    if (supplierError || !supplier) {
       return NextResponse.json(
         { error: 'Supplier tidak ditemukan' },
         { status: 404 }
@@ -91,24 +101,33 @@ export async function POST(request: NextRequest) {
     const hargaSatuanValue = harga_satuan || 0;
     const totalHarga = jumlah * hargaSatuanValue;
 
-    const result = db.prepare(`
-      INSERT INTO transaksi_masuk (tanggal, barang_id, supplier_id, jumlah, harga_satuan, total_harga, keterangan, created_by)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(tanggal, barang_id, supplier_id, jumlah, hargaSatuanValue, totalHarga, keterangan || null, user.id);
+    const { data: newTransaksi, error: insertError } = await supabase
+      .from('transaksi_masuk')
+      .insert({
+        tanggal,
+        barang_id,
+        supplier_id,
+        jumlah,
+        harga_satuan: hargaSatuanValue,
+        total_harga: totalHarga,
+        keterangan: keterangan || null,
+        created_by: user.id,
+      })
+      .select()
+      .single();
+
+    if (insertError) {
+      return NextResponse.json(
+        { error: 'Gagal menambah transaksi masuk' },
+        { status: 500 }
+      );
+    }
 
     const newStok = barang.stok + jumlah;
-    db.prepare('UPDATE barang SET stok = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?').run(newStok, barang_id);
-
-    const newTransaksi = db.prepare(`
-      SELECT 
-        tm.*,
-        b.nama_barang,
-        s.nama as supplier_nama
-      FROM transaksi_masuk tm
-      JOIN barang b ON tm.barang_id = b.id
-      JOIN supplier s ON tm.supplier_id = s.id
-      WHERE tm.id = ?
-    `).get(result.lastInsertRowid);
+    await supabase
+      .from('barang')
+      .update({ stok: newStok, updated_at: new Date().toISOString() })
+      .eq('id', barang_id);
 
     return NextResponse.json({
       success: true,

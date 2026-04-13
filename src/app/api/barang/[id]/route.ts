@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getDatabase } from '@/lib/db';
+import { supabase } from '@/lib/db';
 import { authenticate } from '@/lib/auth';
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -15,10 +15,13 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     }
 
     const { id } = await params;
-    const db = getDatabase();
-    const barang = db.prepare('SELECT * FROM barang WHERE id = ?').get(id);
+    const { data: barang, error } = await supabase
+      .from('barang')
+      .select('*')
+      .eq('id', id)
+      .single();
 
-    if (!barang) {
+    if (error || !barang) {
       return NextResponse.json(
         { error: 'Barang tidak ditemukan' },
         { status: 404 }
@@ -64,9 +67,12 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       keterangan,
     } = body;
 
-    const db = getDatabase();
+    const { data: existing } = await supabase
+      .from('barang')
+      .select('id')
+      .eq('id', id)
+      .single();
 
-    const existing = db.prepare('SELECT id FROM barang WHERE id = ?').get(id);
     if (!existing) {
       return NextResponse.json(
         { error: 'Barang tidak ditemukan' },
@@ -75,7 +81,13 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     }
 
     if (kode_barang) {
-      const duplicate = db.prepare('SELECT id FROM barang WHERE kode_barang = ? AND id != ?').get(kode_barang, id);
+      const { data: duplicate } = await supabase
+        .from('barang')
+        .select('id')
+        .eq('kode_barang', kode_barang)
+        .neq('id', id)
+        .single();
+
       if (duplicate) {
         return NextResponse.json(
           { error: 'Kode barang sudah digunakan' },
@@ -84,33 +96,30 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       }
     }
 
-    db.prepare(`
-      UPDATE barang
-      SET kode_barang = COALESCE(?, kode_barang),
-          nama_barang = COALESCE(?, nama_barang),
-          merk = ?,
-          kategori = ?,
-          stok = COALESCE(?, stok),
-          harga_beli = COALESCE(?, harga_beli),
-          harga_jual = COALESCE(?, harga_jual),
-          satuan = COALESCE(?, satuan),
-          keterangan = ?,
-          updated_at = CURRENT_TIMESTAMP
-      WHERE id = ?
-    `).run(
-      kode_barang,
-      nama_barang,
-      merk,
-      kategori,
-      stok,
-      harga_beli,
-      harga_jual,
-      satuan,
-      keterangan,
-      id
-    );
+    const { data: updatedBarang, error } = await supabase
+      .from('barang')
+      .update({
+        kode_barang: kode_barang,
+        nama_barang: nama_barang,
+        merk: merk || null,
+        kategori: kategori || null,
+        stok: stok,
+        harga_beli: harga_beli,
+        harga_jual: harga_jual,
+        satuan: satuan,
+        keterangan: keterangan || null,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', id)
+      .select()
+      .single();
 
-    const updatedBarang = db.prepare('SELECT * FROM barang WHERE id = ?').get(id);
+    if (error) {
+      return NextResponse.json(
+        { error: 'Gagal update barang' },
+        { status: 500 }
+      );
+    }
 
     return NextResponse.json({
       success: true,
@@ -139,9 +148,13 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
     }
 
     const { id } = await params;
-    const db = getDatabase();
 
-    const existing = db.prepare('SELECT id FROM barang WHERE id = ?').get(id);
+    const { data: existing } = await supabase
+      .from('barang')
+      .select('id')
+      .eq('id', id)
+      .single();
+
     if (!existing) {
       return NextResponse.json(
         { error: 'Barang tidak ditemukan' },
@@ -149,7 +162,17 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
       );
     }
 
-    db.prepare('DELETE FROM barang WHERE id = ?').run(id);
+    const { error } = await supabase
+      .from('barang')
+      .delete()
+      .eq('id', id);
+
+    if (error) {
+      return NextResponse.json(
+        { error: 'Gagal menghapus barang' },
+        { status: 500 }
+      );
+    }
 
     return NextResponse.json({
       success: true,

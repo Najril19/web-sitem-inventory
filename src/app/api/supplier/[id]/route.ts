@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getDatabase } from '@/lib/db';
+import { supabase } from '@/lib/db';
 import { authenticate } from '@/lib/auth';
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -15,10 +15,13 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     }
 
     const { id } = await params;
-    const db = getDatabase();
-    const supplier = db.prepare('SELECT * FROM supplier WHERE id = ?').get(id);
+    const { data: supplier, error } = await supabase
+      .from('supplier')
+      .select('*')
+      .eq('id', id)
+      .single();
 
-    if (!supplier) {
+    if (error || !supplier) {
       return NextResponse.json(
         { error: 'Supplier tidak ditemukan' },
         { status: 404 }
@@ -54,9 +57,12 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     const body = await request.json();
     const { nama, kontak, alamat, keterangan } = body;
 
-    const db = getDatabase();
+    const { data: existing } = await supabase
+      .from('supplier')
+      .select('id')
+      .eq('id', id)
+      .single();
 
-    const existing = db.prepare('SELECT id FROM supplier WHERE id = ?').get(id);
     if (!existing) {
       return NextResponse.json(
         { error: 'Supplier tidak ditemukan' },
@@ -64,17 +70,25 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       );
     }
 
-    db.prepare(`
-      UPDATE supplier
-      SET nama = COALESCE(?, nama),
-          kontak = ?,
-          alamat = ?,
-          keterangan = ?,
-          updated_at = CURRENT_TIMESTAMP
-      WHERE id = ?
-    `).run(nama, kontak, alamat, keterangan, id);
+    const { data: updatedSupplier, error } = await supabase
+      .from('supplier')
+      .update({
+        nama: nama,
+        kontak: kontak || null,
+        alamat: alamat || null,
+        keterangan: keterangan || null,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', id)
+      .select()
+      .single();
 
-    const updatedSupplier = db.prepare('SELECT * FROM supplier WHERE id = ?').get(id);
+    if (error) {
+      return NextResponse.json(
+        { error: 'Gagal update supplier' },
+        { status: 500 }
+      );
+    }
 
     return NextResponse.json({
       success: true,
@@ -103,9 +117,13 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
     }
 
     const { id } = await params;
-    const db = getDatabase();
 
-    const existing = db.prepare('SELECT id FROM supplier WHERE id = ?').get(id);
+    const { data: existing } = await supabase
+      .from('supplier')
+      .select('id')
+      .eq('id', id)
+      .single();
+
     if (!existing) {
       return NextResponse.json(
         { error: 'Supplier tidak ditemukan' },
@@ -113,7 +131,17 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
       );
     }
 
-    db.prepare('DELETE FROM supplier WHERE id = ?').run(id);
+    const { error } = await supabase
+      .from('supplier')
+      .delete()
+      .eq('id', id);
+
+    if (error) {
+      return NextResponse.json(
+        { error: 'Gagal menghapus supplier' },
+        { status: 500 }
+      );
+    }
 
     return NextResponse.json({
       success: true,

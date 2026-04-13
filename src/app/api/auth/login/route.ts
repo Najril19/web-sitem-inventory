@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import bcrypt from 'bcryptjs';
-import { getDatabase } from '@/lib/db';
+import { supabase } from '@/lib/db';
 import { createToken } from '@/lib/auth';
 
 export async function POST(request: NextRequest) {
@@ -15,10 +15,13 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const db = getDatabase();
-    const user = db.prepare('SELECT * FROM users WHERE username = ?').get(username) as any;
+    const { data: user, error } = await supabase
+      .from('users')
+      .select('*')
+      .eq('username', username)
+      .single();
 
-    if (!user) {
+    if (error || !user) {
       return NextResponse.json(
         { error: 'Username atau password salah' },
         { status: 401 }

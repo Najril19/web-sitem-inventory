@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getDatabase } from '@/lib/db';
+import { supabase } from '@/lib/db';
 import { authenticate } from '@/lib/auth';
 
 export async function GET(request: NextRequest) {
@@ -14,8 +14,18 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const db = getDatabase();
-    const userProfile = db.prepare('SELECT id, username, full_name, role, created_at FROM users WHERE id = ?').get(user.id);
+    const { data: userProfile, error } = await supabase
+      .from('users')
+      .select('id, username, full_name, role, created_at')
+      .eq('id', user.id)
+      .single();
+
+    if (error) {
+      return NextResponse.json(
+        { error: 'User tidak ditemukan' },
+        { status: 404 }
+      );
+    }
 
     return NextResponse.json({
       success: true,

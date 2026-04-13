@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getDatabase } from '@/lib/db';
+import { supabase } from '@/lib/db';
 import { authenticate } from '@/lib/auth';
 
 export async function GET(request: NextRequest) {
@@ -14,8 +14,17 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const db = getDatabase();
-    const supplier = db.prepare('SELECT * FROM supplier ORDER BY created_at DESC').all();
+    const { data: supplier, error } = await supabase
+      .from('supplier')
+      .select('*')
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      return NextResponse.json(
+        { error: 'Gagal mengambil data supplier' },
+        { status: 500 }
+      );
+    }
 
     return NextResponse.json({
       success: true,
@@ -52,14 +61,23 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const db = getDatabase();
+    const { data: newSupplier, error } = await supabase
+      .from('supplier')
+      .insert({
+        nama,
+        kontak: kontak || null,
+        alamat: alamat || null,
+        keterangan: keterangan || null,
+      })
+      .select()
+      .single();
 
-    const result = db.prepare(`
-      INSERT INTO supplier (nama, kontak, alamat, keterangan)
-      VALUES (?, ?, ?, ?)
-    `).run(nama, kontak || null, alamat || null, keterangan || null);
-
-    const newSupplier = db.prepare('SELECT * FROM supplier WHERE id = ?').get(result.lastInsertRowid);
+    if (error) {
+      return NextResponse.json(
+        { error: 'Gagal menambah supplier' },
+        { status: 500 }
+      );
+    }
 
     return NextResponse.json({
       success: true,
