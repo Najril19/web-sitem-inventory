@@ -1,12 +1,7 @@
 {
   "experimentalServices": {
     "frontend": {
-      "type": "nextjs",
-      "settings": {
-        "buildCommand": "npm run build",
-        "outputDirectory": ".next",
-        "installCommand": "npm install"
-      }
+      "type": "nextjs"
     },
     "backend": {
       "type": "express",
