@@ -9,7 +9,8 @@
       "type": "web",
       "subdomain": "api",
       "entrypoint": "backend/dist/server.js",
-      "builder": "npx"
+      "builder": "npx",
+      "buildCommand": "cd backend && npm install && npm run build"
     }
   }
 }
