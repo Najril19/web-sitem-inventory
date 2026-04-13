@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { motion } from 'motion/react';
-import { Lock, User, ShoppingBag } from 'lucide-react';
+import { Lock, User, ShoppingBag, AlertCircle } from 'lucide-react';
+import { authApi } from '@/lib/api';
+import { authStorage } from '@/lib/auth';
 
 interface LoginProps {
   onLogin: () => void;
@@ -10,18 +12,27 @@ export default function Login({ onLogin }: LoginProps) {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState('');
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
+    setError('');
 
-    // Simulate login
-    setTimeout(() => {
-      if (username && password) {
-        onLogin();
-      }
+    try {
+      const response = await authApi.login(username, password);
+      
+      // Save token and user data
+      authStorage.setToken(response.token);
+      authStorage.setUser(response.user);
+      
+      // Call onLogin callback
+      onLogin();
+    } catch (err: any) {
+      setError(err.message || 'Login gagal. Periksa username dan password Anda.');
+    } finally {
       setIsLoading(false);
-    }, 1000);
+    }
   };
 
   return (
@@ -56,6 +67,18 @@ export default function Login({ onLogin }: LoginProps) {
           <h2 className="text-2xl font-semibold text-white mb-6">Login</h2>
 
           <form onSubmit={handleSubmit} className="space-y-5">
+            {/* Error Message */}
+            {error && (
+              <motion.div
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="flex items-center gap-2 p-3 bg-red-500/10 border border-red-500/30 rounded-lg text-red-400 text-sm"
+              >
+                <AlertCircle className="w-4 h-4 shrink-0" />
+                <span>{error}</span>
+              </motion.div>
+            )}
+
             {/* Username Input */}
             <div>
               <label className="block text-sm font-medium text-gray-300 mb-2">

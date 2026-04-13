@@ -119,11 +119,11 @@ export function initializeDatabase(dbPath: string) {
   const barangCount = db.prepare('SELECT COUNT(*) as count FROM barang').get() as { count: number };
   if (barangCount.count === 0) {
     const barangs = [
-      ['BRG001', 'Koko Rabbani Premium', 'Rabbani', 'Pakaian Muslim', 145, 200000, 250000, 'Pcs', 'Koko premium quality'],
-      ['BRG002', 'Koko Al-Madinah Classic', 'Al-Madinah', 'Pakaian Muslim', 132, 180000, 220000, 'Pcs', 'Desain klasik elegan'],
-      ['BRG003', 'Koko Dannis Executive', 'Dannis', 'Pakaian Muslim', 128, 220000, 280000, 'Pcs', 'Executive style'],
-      ['BRG004', 'Koko Ethica Modern', 'Ethica', 'Pakaian Muslim', 115, 190000, 235000, 'Pcs', 'Modern contemporary'],
-      ['BRG005', 'Koko Shafira Elegant', 'Shafira', 'Pakaian Muslim', 98, 210000, 265000, 'Pcs', 'Elegant design'],
+      ['BRG001', 'Koko Rabbani Premium', 'Rabbani', 'Pakaian Muslim', 0, 200000, 250000, 'Pcs', 'Koko premium quality'],
+      ['BRG002', 'Koko Al-Madinah Classic', 'Al-Madinah', 'Pakaian Muslim', 0, 180000, 220000, 'Pcs', 'Desain klasik elegan'],
+      ['BRG003', 'Koko Dannis Executive', 'Dannis', 'Pakaian Muslim', 0, 220000, 280000, 'Pcs', 'Executive style'],
+      ['BRG004', 'Koko Ethica Modern', 'Ethica', 'Pakaian Muslim', 0, 190000, 235000, 'Pcs', 'Modern contemporary'],
+      ['BRG005', 'Koko Shafira Elegant', 'Shafira', 'Pakaian Muslim', 0, 210000, 265000, 'Pcs', 'Elegant design'],
     ];
     
     const insertBarang = db.prepare(`
@@ -132,6 +132,22 @@ export function initializeDatabase(dbPath: string) {
     `);
     barangs.forEach(b => insertBarang.run(...b));
     console.log(`✓ Inserted ${barangs.length} sample barang`);
+  }
+
+  // One-time: kosongkan transaksi (masuk/keluar & data laporan); stok barang di-nolkan; supplier tidak diubah
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS schema_migrations (
+      name TEXT PRIMARY KEY NOT NULL
+    )
+  `);
+  const migrationName = 'reset_tx_zero_stok_2026_04';
+  const already = db.prepare('SELECT 1 FROM schema_migrations WHERE name = ?').get(migrationName);
+  if (!already) {
+    db.prepare('DELETE FROM transaksi_masuk').run();
+    db.prepare('DELETE FROM transaksi_keluar').run();
+    db.prepare('UPDATE barang SET stok = 0, updated_at = CURRENT_TIMESTAMP').run();
+    db.prepare('INSERT INTO schema_migrations (name) VALUES (?)').run(migrationName);
+    console.log('✓ Transaksi masuk/keluar dikosongkan; stok semua barang = 0 (supplier tetap)');
   }
 
   console.log('✓ Database initialized successfully');

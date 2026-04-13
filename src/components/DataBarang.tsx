@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Plus, Edit, Trash2, Search, Package } from 'lucide-react';
+import { barangApi } from '@/lib/api';
 
 interface Barang {
   id: number;

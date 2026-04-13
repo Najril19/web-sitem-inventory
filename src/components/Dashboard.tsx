@@ -4,27 +4,13 @@ import { useEffect, useState } from 'react';
 import { motion } from 'motion/react';
 import { Package, TrendingUp, TrendingDown, Database, BarChart3, Calendar } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { dashboardApi } from '@/lib/api';
 
-const statsData = [
-  { icon: Package, label: 'Total Data Barang', value: '247', color: 'from-blue-500 to-blue-600', bgColor: 'bg-blue-50', iconColor: 'text-blue-600' },
-  { icon: Database, label: 'Total Stok Barang', value: '12,845', color: 'from-emerald-500 to-emerald-600', bgColor: 'bg-emerald-50', iconColor: 'text-emerald-600' },
-  { icon: TrendingUp, label: 'Barang Masuk (Bulan Ini)', value: '156', color: 'from-purple-500 to-purple-600', bgColor: 'bg-purple-50', iconColor: 'text-purple-600' },
-  { icon: TrendingDown, label: 'Barang Keluar (Bulan Ini)', value: '89', color: 'from-orange-500 to-orange-600', bgColor: 'bg-orange-50', iconColor: 'text-orange-600' },
-];
-
-const monthlyData = [
-  { month: 'Jan', masuk: 120, keluar: 80 },
-  { month: 'Feb', masuk: 150, keluar: 95 },
-  { month: 'Mar', masuk: 180, keluar: 110 },
-  { month: 'Apr', masuk: 156, keluar: 89 },
-];
-
-const topProducts = [
-  { name: 'Koko Rabbani Premium', stock: 145, brand: 'Rabbani' },
-  { name: 'Koko Al-Madinah Classic', stock: 132, brand: 'Al-Madinah' },
-  { name: 'Koko Dannis Executive', stock: 128, brand: 'Dannis' },
-  { name: 'Koko Ethica Modern', stock: 115, brand: 'Ethica' },
-  { name: 'Koko Shafira Elegant', stock: 98, brand: 'Shafira' },
+const statsConfig = [
+  { icon: Package, label: 'Total Data Barang', key: 'total_barang', color: 'from-blue-500 to-blue-600', bgColor: 'bg-blue-50', iconColor: 'text-blue-600' },
+  { icon: Database, label: 'Total Stok Barang', key: 'total_stok', color: 'from-emerald-500 to-emerald-600', bgColor: 'bg-emerald-50', iconColor: 'text-emerald-600' },
+  { icon: TrendingUp, label: 'Barang Masuk (Bulan Ini)', key: 'barang_masuk_bulan_ini', color: 'from-purple-500 to-purple-600', bgColor: 'bg-purple-50', iconColor: 'text-purple-600' },
+  { icon: TrendingDown, label: 'Barang Keluar (Bulan Ini)', key: 'barang_keluar_bulan_ini', color: 'from-orange-500 to-orange-600', bgColor: 'bg-orange-50', iconColor: 'text-orange-600' },
 ];
 
 function RechartsClientOnly({ children }: { children: React.ReactNode }) {
@@ -37,6 +23,55 @@ function RechartsClientOnly({ children }: { children: React.ReactNode }) {
 }
 
 export default function Dashboard() {
+  const [stats, setStats] = useState<any>(null);
+  const [topProducts, setTopProducts] = useState<any[]>([]);
+  const [monthlyData, setMonthlyData] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    loadDashboardData();
+  }, []);
+
+  const loadDashboardData = async () => {
+    try {
+      const response = await dashboardApi.getStatistics();
+      setStats(response.data.summary);
+      setTopProducts(response.data.top_products);
+      
+      // Format monthly data for chart
+      const formattedMonthly = response.data.monthly_statistics.map((item: any) => {
+        const date = new Date(item.month + '-01');
+        const monthName = date.toLocaleDateString('id-ID', { month: 'short' });
+        return {
+          month: monthName,
+          masuk: item.masuk,
+          keluar: item.keluar,
+        };
+      });
+      setMonthlyData(formattedMonthly);
+    } catch (error) {
+      console.error('Error loading dashboard:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="text-center">
+          <div className="w-16 h-16 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-gray-400">Memuat data dashboard...</p>
+        </div>
+      </div>
+    );
+  }
+
+  const statsData = statsConfig.map((config) => ({
+    ...config,
+    value: stats ? stats[config.key]?.toLocaleString('id-ID') || '0' : '0',
+  }));
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -133,7 +168,7 @@ export default function Dashboard() {
           <div className="space-y-4">
             {topProducts.map((product, index) => (
               <motion.div
-                key={product.name}
+                key={product.id ?? `${product.kode_barang ?? 'item'}-${index}`}
                 initial={{ opacity: 0, x: -20 }}
                 animate={{ opacity: 1, x: 0 }}
                 transition={{ delay: 0.6 + index * 0.1 }}
@@ -144,12 +179,12 @@ export default function Dashboard() {
                     {index + 1}
                   </div>
                   <div>
-                    <p className="font-medium text-white">{product.name}</p>
-                    <p className="text-sm text-gray-400">{product.brand}</p>
+                    <p className="font-medium text-white">{product.nama_barang ?? product.name}</p>
+                    <p className="text-sm text-gray-400">{product.merk ?? product.brand}</p>
                   </div>
                 </div>
                 <div className="text-right">
-                  <p className="font-semibold text-white">{product.stock}</p>
+                  <p className="font-semibold text-white">{product.stok ?? product.stock}</p>
                   <p className="text-xs text-gray-400">Unit</p>
                 </div>
               </motion.div>

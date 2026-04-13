@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import {
   LayoutDashboard,
@@ -21,8 +21,22 @@ import DataSupplier from './DataSupplier';
 import TransaksiMasuk from './TransaksiMasuk';
 import TransaksiKeluar from './TransaksiKeluar';
 import Laporan from './Laporan';
+import { authStorage } from '@/lib/auth';
 
 type Page = 'dashboard' | 'barang' | 'supplier' | 'masuk' | 'keluar' | 'laporan';
+
+const LAST_PAGE_KEY = 'app_current_page';
+
+const PAGE_IDS: Page[] = ['dashboard', 'barang', 'supplier', 'masuk', 'keluar', 'laporan'];
+
+function readSavedPage(): Page | null {
+  if (typeof window === 'undefined') return null;
+  const raw = localStorage.getItem(LAST_PAGE_KEY);
+  if (raw && PAGE_IDS.includes(raw as Page)) {
+    return raw as Page;
+  }
+  return null;
+}
 
 const menuItems = [
   { id: 'dashboard' as Page, name: 'Dashboard', icon: LayoutDashboard, color: 'blue' },
@@ -34,16 +48,38 @@ const menuItems = [
 ];
 
 export default function AppShell() {
+  const [authReady, setAuthReady] = useState(false);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [currentPage, setCurrentPage] = useState<Page>('dashboard');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+
+  useEffect(() => {
+    const authed = authStorage.isAuthenticated();
+    setIsLoggedIn(authed);
+    if (authed) {
+      const saved = readSavedPage();
+      if (saved) {
+        setCurrentPage(saved);
+      }
+    }
+    setAuthReady(true);
+  }, []);
+
+  useEffect(() => {
+    if (!authReady || !isLoggedIn) return;
+    localStorage.setItem(LAST_PAGE_KEY, currentPage);
+  }, [authReady, isLoggedIn, currentPage]);
 
   const openLogoutDialog = () => {
     setShowLogoutConfirm(true);
   };
 
   const confirmLogout = () => {
+    authStorage.logout();
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem(LAST_PAGE_KEY);
+    }
     setIsLoggedIn(false);
     setCurrentPage('dashboard');
     setShowLogoutConfirm(false);
@@ -54,8 +90,26 @@ export default function AppShell() {
     setShowLogoutConfirm(false);
   };
 
+  if (!authReady) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-gray-900">
+        <div className="h-10 w-10 animate-spin rounded-full border-2 border-emerald-500 border-t-transparent" aria-hidden />
+      </div>
+    );
+  }
+
   if (!isLoggedIn) {
-    return <Login onLogin={() => setIsLoggedIn(true)} />;
+    return (
+      <Login
+        onLogin={() => {
+          setIsLoggedIn(true);
+          const saved = readSavedPage();
+          if (saved) {
+            setCurrentPage(saved);
+          }
+        }}
+      />
+    );
   }
 
   const renderPage = () => {
