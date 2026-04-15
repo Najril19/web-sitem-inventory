@@ -1,40 +1,65 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Plus, Edit, Trash2, Search, Package } from 'lucide-react';
-import { barangApi } from '@/lib/api';
+import { Plus, Edit, Trash2, Search, Package, RefreshCw, Loader2 } from 'lucide-react';
+import { authStorage } from '@/lib/auth';
+import { useNotification, NotificationContainer } from '@/components/Notification';
 
 interface Barang {
   id: number;
-  kode: string;
-  nama: string;
+  kode_barang: string;
+  nama_barang: string;
   merk: string;
+  kategori: string;
   satuan: string;
   stok: number;
-  harga: number;
+  harga_beli: number;
+  harga_jual: number;
+  keterangan: string;
 }
 
-const initialBarang: Barang[] = [
-  { id: 1, kode: 'BRG001', nama: 'Koko Rabbani Premium', merk: 'Rabbani', satuan: 'Pcs', stok: 145, harga: 250000 },
-  { id: 2, kode: 'BRG002', nama: 'Koko Al-Madinah Classic', merk: 'Al-Madinah', satuan: 'Pcs', stok: 132, harga: 220000 },
-  { id: 3, kode: 'BRG003', nama: 'Koko Dannis Executive', merk: 'Dannis', satuan: 'Pcs', stok: 128, harga: 280000 },
-  { id: 4, kode: 'BRG004', nama: 'Koko Ethica Modern', merk: 'Ethica', satuan: 'Pcs', stok: 115, harga: 235000 },
-  { id: 5, kode: 'BRG005', nama: 'Koko Shafira Elegant', merk: 'Shafira', satuan: 'Pcs', stok: 98, harga: 265000 },
-  { id: 6, kode: 'BRG006', nama: 'Koko Zoya Premium', merk: 'Zoya', satuan: 'Pcs', stok: 87, harga: 290000 },
-  { id: 7, kode: 'BRG007', nama: 'Koko Al-Ikhwan Bordir', merk: 'Al-Ikhwan', satuan: 'Pcs', stok: 76, harga: 245000 },
-  { id: 8, kode: 'BRG008', nama: 'Koko Ammar Classic', merk: 'Ammar', satuan: 'Pcs', stok: 64, harga: 215000 },
-];
-
 export default function DataBarang() {
-  const [barang, setBarang] = useState<Barang[]>(initialBarang);
+  const [barang, setBarang] = useState<Barang[]>([]);
+  const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [showModal, setShowModal] = useState(false);
   const [editingItem, setEditingItem] = useState<Barang | null>(null);
   const [formData, setFormData] = useState<Partial<Barang>>({});
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
+  // Notification hook
+  const { notifications, removeNotification, showSuccess, showError, showWarning } = useNotification();
+
+  const fetchBarang = async () => {
+    try {
+      const token = authStorage.getToken();
+      const response = await fetch('/api/barang', {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      const result = await response.json();
+      if (result.success) {
+        setBarang(result.data);
+      } else {
+        showError('Gagal Memuat Data', result.message || 'Tidak dapat memuat data barang');
+      }
+    } catch (error) {
+      console.error('Error fetching barang:', error);
+      showError('Error Koneksi', 'Tidak dapat terhubung ke server. Periksa koneksi internet Anda.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchBarang();
+  }, []);
 
   const filteredBarang = barang.filter(item =>
-    item.nama.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    item.kode.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    item.merk.toLowerCase().includes(searchTerm.toLowerCase())
+    item.nama_barang.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    item.kode_barang.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (item.merk && item.merk.toLowerCase().includes(searchTerm.toLowerCase()))
   );
 
   const handleAdd = () => {
@@ -49,29 +74,117 @@ export default function DataBarang() {
     setShowModal(true);
   };
 
-  const handleDelete = (id: number) => {
-    if (confirm('Yakin ingin menghapus data ini?')) {
-      setBarang(barang.filter(item => item.id !== id));
+  const handleDelete = async (id: number) => {
+    const itemToDelete = barang.find(item => item.id === id);
+    
+    if (confirm(`Yakin ingin menghapus "${itemToDelete?.nama_barang}"?`)) {
+      try {
+        const token = authStorage.getToken();
+        const response = await fetch(`/api/barang/${id}`, {
+          method: 'DELETE',
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        });
+        
+        const result = await response.json();
+        
+        if (response.ok && result.success) {
+          fetchBarang();
+          showSuccess('Berhasil Dihapus', `${itemToDelete?.nama_barang} berhasil dihapus dari database`);
+        } else {
+          showError('Gagal Menghapus', result.message || 'Tidak dapat menghapus data barang');
+        }
+      } catch (error) {
+        console.error('Error deleting barang:', error);
+        showError('Error Koneksi', 'Tidak dapat terhubung ke server untuk menghapus data');
+      }
     }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (editingItem) {
-      setBarang(barang.map(item => item.id === editingItem.id ? { ...item, ...formData } : item));
-    } else {
-      const { id, ...formDataWithoutId } = formData as Barang;
-      const newItem = {
-        id: Math.max(...barang.map(b => b.id)) + 1,
-        ...formDataWithoutId
-      };
-      setBarang([...barang, newItem]);
+    
+    // Validasi form
+    if (!formData.nama_barang?.trim()) {
+      showError('Data Tidak Lengkap', 'Nama barang harus diisi');
+      return;
     }
-    setShowModal(false);
+    
+    if (!formData.kode_barang?.trim()) {
+      showError('Data Tidak Lengkap', 'Kode barang harus diisi');
+      return;
+    }
+    
+    if (!formData.harga_beli || formData.harga_beli <= 0) {
+      showError('Harga Tidak Valid', 'Harga beli harus lebih dari 0');
+      return;
+    }
+    
+    if (!formData.harga_jual || formData.harga_jual <= 0) {
+      showError('Harga Tidak Valid', 'Harga jual harus lebih dari 0');
+      return;
+    }
+
+    setIsSubmitting(true);
+
+    try {
+      const token = authStorage.getToken();
+      const url = editingItem ? `/api/barang/${editingItem.id}` : '/api/barang';
+      const method = editingItem ? 'PUT' : 'POST';
+      
+      const response = await fetch(url, {
+        method,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(formData)
+      });
+
+      const result = await response.json();
+
+      if (response.ok && result.success) {
+        // Refresh data barang dengan animasi
+        setIsRefreshing(true);
+        await fetchBarang();
+        
+        // Delay untuk animasi refresh
+        setTimeout(() => {
+          setIsRefreshing(false);
+        }, 800);
+        
+        // Tutup modal
+        setShowModal(false);
+        
+        if (editingItem) {
+          showSuccess('Berhasil Diperbarui', `Data ${formData.nama_barang} berhasil diperbarui`);
+        } else {
+          showSuccess('Berhasil Ditambahkan', `${formData.nama_barang} berhasil ditambahkan ke database`);
+        }
+      } else {
+        if (result.message?.includes('kode_barang')) {
+          showError('Kode Barang Sudah Ada', 'Kode barang sudah digunakan, silakan gunakan kode lain');
+        } else {
+          showError('Gagal Menyimpan', result.message || 'Terjadi kesalahan saat menyimpan data');
+        }
+      }
+    } catch (error) {
+      console.error('Error saving barang:', error);
+      showError('Error Koneksi', 'Tidak dapat terhubung ke server untuk menyimpan data');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
     <div className="space-y-6 w-full max-w-full">
+      {/* Notification Container */}
+      <NotificationContainer 
+        notifications={notifications} 
+        onClose={removeNotification} 
+      />
+
       {/* Header */}
       <motion.div
         initial={{ opacity: 0, y: -20 }}
@@ -115,8 +228,17 @@ export default function DataBarang() {
       {/* Table */}
       <motion.div
         initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.2 }}
+        animate={{ 
+          opacity: 1, 
+          y: 0,
+          scale: isRefreshing ? [1, 1.02, 1] : 1,
+          rotateY: isRefreshing ? [0, 5, 0] : 0
+        }}
+        transition={{ 
+          delay: 0.2,
+          scale: { duration: 0.8, ease: "easeInOut" },
+          rotateY: { duration: 0.8, ease: "easeInOut" }
+        }}
         className="bg-gray-800 rounded-xl shadow-lg shadow-black/50 border border-gray-700 overflow-hidden w-full"
       >
         <div className="overflow-x-auto w-full">
@@ -126,7 +248,6 @@ export default function DataBarang() {
                 <th className="px-6 py-4 text-left text-sm font-semibold text-gray-300">No</th>
                 <th className="px-6 py-4 text-left text-sm font-semibold text-gray-300">Kode</th>
                 <th className="px-6 py-4 text-left text-sm font-semibold text-gray-300">Nama Barang</th>
-                <th className="px-6 py-4 text-left text-sm font-semibold text-gray-300">Merk</th>
                 <th className="px-6 py-4 text-left text-sm font-semibold text-gray-300">Satuan</th>
                 <th className="px-6 py-4 text-left text-sm font-semibold text-gray-300">Stok</th>
                 <th className="px-6 py-4 text-left text-sm font-semibold text-gray-300">Harga</th>
@@ -145,9 +266,8 @@ export default function DataBarang() {
                     className="hover:bg-gray-700/50 transition-colors"
                   >
                     <td className="px-6 py-4 text-gray-300">{index + 1}</td>
-                    <td className="px-6 py-4 font-medium text-white">{item.kode}</td>
-                    <td className="px-6 py-4 text-gray-300">{item.nama}</td>
-                    <td className="px-6 py-4 text-gray-300">{item.merk}</td>
+                    <td className="px-6 py-4 font-medium text-white">{item.kode_barang}</td>
+                    <td className="px-6 py-4 text-gray-300">{item.nama_barang} {item.merk}</td>
                     <td className="px-6 py-4 text-gray-300">{item.satuan}</td>
                     <td className="px-6 py-4">
                       <span className={`inline-flex px-3 py-1 rounded-full text-sm font-medium ${
@@ -158,7 +278,7 @@ export default function DataBarang() {
                         {item.stok}
                       </span>
                     </td>
-                    <td className="px-6 py-4 text-gray-300">Rp {item.harga.toLocaleString('id-ID')}</td>
+                    <td className="px-6 py-4 text-gray-300">Rp {item.harga_jual.toLocaleString('id-ID')}</td>
                     <td className="px-6 py-4">
                       <div className="flex gap-2">
                         <motion.button
@@ -216,23 +336,25 @@ export default function DataBarang() {
               <form onSubmit={handleSubmit} className="space-y-4">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-300 mb-2">Kode Barang</label>
+                    <label className="block text-sm font-medium text-gray-300 mb-2">Kode Barang {!editingItem && '*'}</label>
                     <input
                       type="text"
-                      value={formData.kode || ''}
-                      onChange={(e) => setFormData({ ...formData, kode: e.target.value })}
+                      value={formData.kode_barang || ''}
+                      onChange={(e) => setFormData({ ...formData, kode_barang: e.target.value })}
                       className="w-full px-4 py-2 border border-gray-600 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 bg-gray-700 text-white"
-                      required
+                      required={!editingItem}
+                      placeholder="Masukkan kode barang"
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-300 mb-2">Nama Barang</label>
+                    <label className="block text-sm font-medium text-gray-300 mb-2">Nama Barang {!editingItem && '*'}</label>
                     <input
                       type="text"
-                      value={formData.nama || ''}
-                      onChange={(e) => setFormData({ ...formData, nama: e.target.value })}
+                      value={formData.nama_barang || ''}
+                      onChange={(e) => setFormData({ ...formData, nama_barang: e.target.value })}
                       className="w-full px-4 py-2 border border-gray-600 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 bg-gray-700 text-white"
-                      required
+                      required={!editingItem}
+                      placeholder="Masukkan nama barang"
                     />
                   </div>
                   <div>
@@ -242,7 +364,7 @@ export default function DataBarang() {
                       value={formData.merk || ''}
                       onChange={(e) => setFormData({ ...formData, merk: e.target.value })}
                       className="w-full px-4 py-2 border border-gray-600 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 bg-gray-700 text-white"
-                      required
+                      placeholder="Masukkan merk barang"
                     />
                   </div>
                   <div>
@@ -251,12 +373,12 @@ export default function DataBarang() {
                       value={formData.satuan || ''}
                       onChange={(e) => setFormData({ ...formData, satuan: e.target.value })}
                       className="w-full px-4 py-2 border border-gray-600 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 bg-gray-700 text-white"
-                      required
                     >
                       <option value="">Pilih Satuan</option>
                       <option value="Pcs">Pcs</option>
                       <option value="Lusin">Lusin</option>
                       <option value="Pack">Pack</option>
+                      <option value="Unit">Unit</option>
                     </select>
                   </div>
                   <div>
@@ -264,38 +386,57 @@ export default function DataBarang() {
                     <input
                       type="number"
                       value={formData.stok || ''}
-                      onChange={(e) => setFormData({ ...formData, stok: parseInt(e.target.value) })}
+                      onChange={(e) => setFormData({ ...formData, stok: e.target.value ? parseInt(e.target.value) : 0 })}
                       className="w-full px-4 py-2 border border-gray-600 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 bg-gray-700 text-white"
-                      required
+                      min="0"
+                      placeholder="0"
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-300 mb-2">Harga</label>
+                    <label className="block text-sm font-medium text-gray-300 mb-2">Harga Jual</label>
                     <input
                       type="number"
-                      value={formData.harga || ''}
-                      onChange={(e) => setFormData({ ...formData, harga: parseInt(e.target.value) })}
+                      value={formData.harga_jual || ''}
+                      onChange={(e) => setFormData({ ...formData, harga_jual: e.target.value ? parseInt(e.target.value) : 0 })}
                       className="w-full px-4 py-2 border border-gray-600 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 bg-gray-700 text-white"
-                      required
+                      min="0"
+                      placeholder="0"
                     />
                   </div>
                 </div>
 
                 <div className="flex gap-3 pt-4">
                   <motion.button
-                    whileHover={{ scale: 1.02 }}
-                    whileTap={{ scale: 0.98 }}
+                    whileHover={!isSubmitting ? { scale: 1.02 } : {}}
+                    whileTap={!isSubmitting ? { scale: 0.98 } : {}}
                     type="submit"
-                    className="flex-1 bg-gradient-to-r from-emerald-500 to-emerald-600 text-white py-3 rounded-lg font-medium shadow-lg shadow-emerald-500/30 hover:shadow-xl transition-all"
+                    disabled={isSubmitting}
+                    className={`flex-1 py-3 rounded-lg font-medium shadow-lg transition-all flex items-center justify-center gap-2 ${
+                      isSubmitting 
+                        ? 'bg-gray-600 text-gray-300 cursor-not-allowed' 
+                        : 'bg-gradient-to-r from-emerald-500 to-emerald-600 text-white shadow-emerald-500/30 hover:shadow-xl'
+                    }`}
                   >
-                    {editingItem ? 'Simpan Perubahan' : 'Tambah Barang'}
+                    {isSubmitting ? (
+                      <>
+                        <Loader2 className="w-5 h-5 animate-spin" />
+                        Menyimpan...
+                      </>
+                    ) : (
+                      editingItem ? 'Simpan Perubahan' : 'Tambah Barang'
+                    )}
                   </motion.button>
                   <motion.button
                     whileHover={{ scale: 1.02 }}
                     whileTap={{ scale: 0.98 }}
                     type="button"
                     onClick={() => setShowModal(false)}
-                    className="flex-1 bg-gray-700 text-gray-300 py-3 rounded-lg font-medium hover:bg-gray-600 transition-colors border border-gray-600"
+                    disabled={isSubmitting}
+                    className={`flex-1 py-3 rounded-lg font-medium border transition-colors ${
+                      isSubmitting
+                        ? 'bg-gray-800 text-gray-500 border-gray-700 cursor-not-allowed'
+                        : 'bg-gray-700 text-gray-300 border-gray-600 hover:bg-gray-600'
+                    }`}
                   >
                     Batal
                   </motion.button>

@@ -24,7 +24,7 @@ export async function GET(request: NextRequest) {
         total_harga,
         keterangan,
         created_at,
-        barang:barang_id(id, nama_barang, kode_barang),
+        barang:barang_id(id, nama_barang, kode_barang, merk),
         supplier:supplier_id(id, nama)
       `)
       .order('tanggal', { ascending: false })
@@ -65,9 +65,9 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const { tanggal, barang_id, supplier_id, jumlah, harga_satuan, keterangan } = body;
 
-    if (!tanggal || !barang_id || !supplier_id || !jumlah) {
+    if (!barang_id || !jumlah) {
       return NextResponse.json(
-        { error: 'Tanggal, barang, supplier, dan jumlah harus diisi' },
+        { error: 'Barang dan jumlah harus diisi' },
         { status: 400 }
       );
     }
@@ -85,17 +85,20 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { data: supplier, error: supplierError } = await supabase
-      .from('supplier')
-      .select('id')
-      .eq('id', supplier_id)
-      .single();
+    // Validasi supplier hanya jika supplier_id diberikan
+    if (supplier_id) {
+      const { data: supplier, error: supplierError } = await supabase
+        .from('supplier')
+        .select('id')
+        .eq('id', supplier_id)
+        .single();
 
-    if (supplierError || !supplier) {
-      return NextResponse.json(
-        { error: 'Supplier tidak ditemukan' },
-        { status: 404 }
-      );
+      if (supplierError || !supplier) {
+        return NextResponse.json(
+          { error: 'Supplier tidak ditemukan' },
+          { status: 404 }
+        );
+      }
     }
 
     const hargaSatuanValue = harga_satuan || 0;
@@ -104,9 +107,9 @@ export async function POST(request: NextRequest) {
     const { data: newTransaksi, error: insertError } = await supabase
       .from('transaksi_masuk')
       .insert({
-        tanggal,
+        tanggal: tanggal || new Date().toISOString().split('T')[0],
         barang_id,
-        supplier_id,
+        supplier_id: supplier_id || null,
         jumlah,
         harga_satuan: hargaSatuanValue,
         total_harga: totalHarga,

@@ -1,34 +1,51 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Plus, Edit, Trash2, Search, Truck, Phone, MapPin } from 'lucide-react';
+import { authStorage } from '@/lib/auth';
 
 interface Supplier {
   id: number;
   nama: string;
+  kontak: string;
   alamat: string;
-  telepon: string;
-  email: string;
+  keterangan: string;
 }
 
-const initialSuppliers: Supplier[] = [
-  { id: 1, nama: 'PT Rabbani Textile', alamat: 'Jl. Raya Bandung No. 123', telepon: '022-1234567', email: 'rabbani@supplier.com' },
-  { id: 2, nama: 'CV Al-Madinah Fashion', alamat: 'Jl. Surabaya No. 45', telepon: '031-7654321', email: 'almadinah@supplier.com' },
-  { id: 3, nama: 'UD Dannis Collection', alamat: 'Jl. Jakarta Timur No. 78', telepon: '021-9876543', email: 'dannis@supplier.com' },
-  { id: 4, nama: 'Toko Ethica Pusat', alamat: 'Jl. Solo No. 90', telepon: '0271-555666', email: 'ethica@supplier.com' },
-  { id: 5, nama: 'PT Shafira Karya', alamat: 'Jl. Yogyakarta No. 12', telepon: '0274-333444', email: 'shafira@supplier.com' },
-];
-
 export default function DataSupplier() {
-  const [suppliers, setSuppliers] = useState<Supplier[]>(initialSuppliers);
+  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
+  const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [showModal, setShowModal] = useState(false);
   const [editingItem, setEditingItem] = useState<Supplier | null>(null);
   const [formData, setFormData] = useState<Partial<Supplier>>({});
 
+  const fetchSuppliers = async () => {
+    try {
+      const token = authStorage.getToken();
+      const response = await fetch('/api/supplier', {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      const result = await response.json();
+      if (result.success) {
+        setSuppliers(result.data);
+      }
+    } catch (error) {
+      console.error('Error fetching suppliers:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchSuppliers();
+  }, []);
+
   const filteredSuppliers = suppliers.filter(item =>
     item.nama.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    item.alamat.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    item.telepon.includes(searchTerm)
+    (item.alamat && item.alamat.toLowerCase().includes(searchTerm.toLowerCase())) ||
+    (item.kontak && item.kontak.includes(searchTerm))
   );
 
   const handleAdd = () => {
@@ -43,25 +60,48 @@ export default function DataSupplier() {
     setShowModal(true);
   };
 
-  const handleDelete = (id: number) => {
+  const handleDelete = async (id: number) => {
     if (confirm('Yakin ingin menghapus supplier ini?')) {
-      setSuppliers(suppliers.filter(item => item.id !== id));
+      try {
+        const token = authStorage.getToken();
+        const response = await fetch(`/api/supplier/${id}`, {
+          method: 'DELETE',
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        });
+        if (response.ok) {
+          fetchSuppliers();
+        }
+      } catch (error) {
+        console.error('Error deleting supplier:', error);
+      }
     }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (editingItem) {
-      setSuppliers(suppliers.map(item => item.id === editingItem.id ? { ...item, ...formData } : item));
-    } else {
-      const { id, ...formDataWithoutId } = formData as Supplier;
-      const newItem = {
-        id: Math.max(...suppliers.map(s => s.id)) + 1,
-        ...formDataWithoutId
-      };
-      setSuppliers([...suppliers, newItem]);
+    try {
+      const token = authStorage.getToken();
+      const url = editingItem ? `/api/supplier/${editingItem.id}` : '/api/supplier';
+      const method = editingItem ? 'PUT' : 'POST';
+      
+      const response = await fetch(url, {
+        method,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(formData)
+      });
+
+      if (response.ok) {
+        fetchSuppliers();
+        setShowModal(false);
+      }
+    } catch (error) {
+      console.error('Error saving supplier:', error);
     }
-    setShowModal(false);
   };
 
   return (
@@ -152,14 +192,16 @@ export default function DataSupplier() {
                 </div>
                 <div className="flex items-center gap-2">
                   <Phone className="w-4 h-4 text-gray-400 flex-shrink-0" />
-                  <p className="text-sm text-gray-300">{supplier.telepon}</p>
+                  <p className="text-sm text-gray-300">{supplier.kontak}</p>
                 </div>
-                <div className="flex items-center gap-2">
-                  <svg className="w-4 h-4 text-gray-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                {supplier.keterangan && (
+                <div className="flex items-start gap-2">
+                  <svg className="w-4 h-4 text-gray-400 mt-1 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                   </svg>
-                  <p className="text-sm text-gray-300 truncate">{supplier.email}</p>
+                  <p className="text-sm text-gray-300">{supplier.keterangan}</p>
                 </div>
+                )}
               </div>
             </motion.div>
           ))}
@@ -215,23 +257,22 @@ export default function DataSupplier() {
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-300 mb-2">Telepon</label>
+                    <label className="block text-sm font-medium text-gray-300 mb-2">Kontak</label>
                     <input
                       type="text"
-                      value={formData.telepon || ''}
-                      onChange={(e) => setFormData({ ...formData, telepon: e.target.value })}
+                      value={formData.kontak || ''}
+                      onChange={(e) => setFormData({ ...formData, kontak: e.target.value })}
                       className="w-full px-4 py-2 border border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-gray-700 text-white"
                       required
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-300 mb-2">Email</label>
+                    <label className="block text-sm font-medium text-gray-300 mb-2">Keterangan</label>
                     <input
-                      type="email"
-                      value={formData.email || ''}
-                      onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                      type="text"
+                      value={formData.keterangan || ''}
+                      onChange={(e) => setFormData({ ...formData, keterangan: e.target.value })}
                       className="w-full px-4 py-2 border border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-gray-700 text-white"
-                      required
                     />
                   </div>
                 </div>

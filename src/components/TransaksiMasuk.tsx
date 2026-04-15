@@ -1,46 +1,179 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Plus, TrendingUp, Calendar, Package, Truck, ArrowDownCircle, CheckCircle, Clock, PackagePlus } from 'lucide-react';
+import { Plus, TrendingUp, Calendar, Package, Truck, ArrowDownCircle, CheckCircle, Clock, PackagePlus, Search, ChevronLeft, ChevronRight, Loader2 } from 'lucide-react';
 import { InventoryDatePicker } from '@/components/InventoryDatePicker';
+import { authStorage } from '@/lib/auth';
+import { useNotification, NotificationContainer } from '@/components/Notification';
 
 interface TransaksiMasuk {
   id: number;
   tanggal: string;
-  barang: string;
+  barang_id: number;
+  barang?: { nama_barang: string; merk?: string };
+  supplier_id: number;
+  supplier?: { nama: string };
   jumlah: number;
-  supplier: string;
   keterangan: string;
 }
 
-const initialTransaksi: TransaksiMasuk[] = [
-  { id: 1, tanggal: '2026-04-10', barang: 'Koko Rabbani Premium', jumlah: 50, supplier: 'PT Rabbani Textile', keterangan: 'Restok rutin' },
-  { id: 2, tanggal: '2026-04-09', barang: 'Koko Al-Madinah Classic', jumlah: 30, supplier: 'CV Al-Madinah Fashion', keterangan: 'Order khusus' },
-  { id: 3, tanggal: '2026-04-08', barang: 'Koko Dannis Executive', jumlah: 40, supplier: 'UD Dannis Collection', keterangan: 'Restok' },
-  { id: 4, tanggal: '2026-04-07', barang: 'Koko Ethica Modern', jumlah: 35, supplier: 'Toko Ethica Pusat', keterangan: 'Restok rutin' },
-];
-
 export default function TransaksiMasuk() {
-  const [transaksi, setTransaksi] = useState<TransaksiMasuk[]>(initialTransaksi);
+  const [transaksi, setTransaksi] = useState<TransaksiMasuk[]>([]);
+  const [barangList, setBarangList] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [formData, setFormData] = useState<Partial<TransaksiMasuk>>({
     tanggal: new Date().toISOString().split('T')[0]
   });
+  const [searchTerm, setSearchTerm] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 25;
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    const newTransaksi = {
-      ...formData as TransaksiMasuk,
-      id: Math.max(...transaksi.map(t => t.id)) + 1,
-    };
-    setTransaksi([newTransaksi, ...transaksi]);
-    setShowModal(false);
-    setFormData({ tanggal: new Date().toISOString().split('T')[0] });
+  // Notification hook
+  const { notifications, removeNotification, showSuccess, showError, showWarning } = useNotification();
+
+  const fetchTransaksi = async () => {
+    try {
+      const token = authStorage.getToken();
+      const response = await fetch('/api/transaksi-masuk', {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      const result = await response.json();
+      if (result.success) {
+        setTransaksi(result.data);
+      } else {
+        showError('Gagal Memuat Data', result.message || 'Tidak dapat memuat data transaksi masuk');
+      }
+    } catch (error) {
+      console.error('Error fetching transaksi masuk:', error);
+      showError('Error Koneksi', 'Tidak dapat terhubung ke server. Periksa koneksi internet Anda.');
+    } finally {
+      setLoading(false);
+    }
   };
+
+  const fetchBarang = async () => {
+    try {
+      const token = authStorage.getToken();
+      const response = await fetch('/api/barang', {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      const result = await response.json();
+      if (result.success) {
+        setBarangList(result.data);
+      } else {
+        showError('Gagal Memuat Barang', result.message || 'Tidak dapat memuat daftar barang');
+      }
+    } catch (error) {
+      console.error('Error fetching barang:', error);
+      showError('Error Koneksi', 'Tidak dapat memuat daftar barang dari server');
+    }
+  };
+
+  useEffect(() => {
+    fetchTransaksi();
+    fetchBarang();
+  }, []);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    // Validasi form - hanya barang dan jumlah yang wajib
+    if (!formData.barang_id) {
+      showError('Data Tidak Lengkap', 'Silakan pilih barang terlebih dahulu');
+      return;
+    }
+    
+    if (!formData.jumlah || formData.jumlah <= 0) {
+      showError('Jumlah Tidak Valid', 'Jumlah barang harus lebih dari 0');
+      return;
+    }
+
+    setIsSubmitting(true);
+
+    try {
+      const token = authStorage.getToken();
+      
+      const response = await fetch('/api/transaksi-masuk', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(formData)
+      });
+
+      const result = await response.json();
+
+      if (response.ok && result.success) {
+        // Refresh data transaksi dengan animasi
+        setIsRefreshing(true);
+        await fetchTransaksi();
+        
+        // Delay untuk animasi refresh
+        setTimeout(() => {
+          setIsRefreshing(false);
+        }, 800);
+        
+        // Tutup modal
+        setShowModal(false);
+        setFormData({ tanggal: new Date().toISOString().split('T')[0] });
+        
+        const selectedBarang = barangList.find(b => b.id === formData.barang_id);
+        const supplierText = formData.supplier_id ? 
+          ` dari ${['', 'PT Rabbani Textile', 'CV Al-Madinah Fashion', 'UD Dannis Collection', 'Toko Ethica Pusat'][formData.supplier_id]}` : 
+          '';
+        
+        showSuccess(
+          'Transaksi Berhasil!', 
+          `${formData.jumlah} unit ${selectedBarang?.nama_barang || 'barang'}${supplierText} berhasil ditambahkan ke stok`
+        );
+      } else {
+        // Handle specific error messages
+        if (result.message?.includes('stok')) {
+          showError('Stok Tidak Mencukupi', result.message);
+        } else if (result.message?.includes('barang')) {
+          showError('Barang Tidak Ditemukan', result.message);
+        } else if (result.message?.includes('supplier')) {
+          showError('Supplier Tidak Valid', result.message);
+        } else {
+          showError('Gagal Menyimpan', result.message || 'Terjadi kesalahan saat menyimpan transaksi');
+        }
+      }
+    } catch (error) {
+      console.error('Error saving transaksi masuk:', error);
+      showError('Error Koneksi', 'Tidak dapat terhubung ke server. Periksa koneksi internet Anda.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const filteredTransaksi = transaksi.filter(item =>
+    item.barang?.nama_barang?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    item.supplier?.nama?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    item.keterangan?.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  const totalPages = Math.ceil(filteredTransaksi.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  const paginatedTransaksi = filteredTransaksi.slice(startIndex, endIndex);
 
   const totalMasuk = transaksi.reduce((sum, t) => sum + t.jumlah, 0);
 
   return (
     <div className="space-y-6">
+      {/* Notification Container */}
+      <NotificationContainer 
+        notifications={notifications} 
+        onClose={removeNotification} 
+      />
+
       {/* Header */}
       <motion.div
         initial={{ opacity: 0, y: -20 }}
@@ -80,11 +213,42 @@ export default function TransaksiMasuk() {
         </div>
       </motion.div>
 
-      {/* Table */}
+      {/* Search Bar */}
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.2 }}
+        transition={{ delay: 0.15 }}
+        className="bg-gray-800 rounded-xl shadow-lg shadow-black/50 border border-gray-700 p-4"
+      >
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500 w-5 h-5" />
+          <input
+            type="text"
+            placeholder="Cari nama barang, supplier, atau keterangan..."
+            value={searchTerm}
+            onChange={(e) => {
+              setSearchTerm(e.target.value);
+              setCurrentPage(1);
+            }}
+            className="w-full pl-10 pr-4 py-3 border border-gray-600 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 bg-gray-700 text-white"
+          />
+        </div>
+      </motion.div>
+
+      {/* Table */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ 
+          opacity: 1, 
+          y: 0,
+          scale: isRefreshing ? [1, 1.02, 1] : 1,
+          rotateY: isRefreshing ? [0, 5, 0] : 0
+        }}
+        transition={{ 
+          delay: 0.2,
+          scale: { duration: 0.8, ease: "easeInOut" },
+          rotateY: { duration: 0.8, ease: "easeInOut" }
+        }}
         className="bg-gray-800 rounded-xl shadow-lg shadow-black/50 border border-gray-700 overflow-hidden"
       >
         <div className="overflow-x-auto">
@@ -131,7 +295,7 @@ export default function TransaksiMasuk() {
             </thead>
             <tbody className="divide-y divide-gray-700">
               <AnimatePresence>
-                {transaksi.map((item, index) => (
+                {paginatedTransaksi.map((item, index) => (
                   <motion.tr
                     key={item.id}
                     initial={{ opacity: 0, x: -20 }}
@@ -143,7 +307,7 @@ export default function TransaksiMasuk() {
                     <td className="px-6 py-4 text-gray-300">
                       <div className="flex items-center gap-2">
                         <div className="w-6 h-6 bg-emerald-500/20 rounded-full flex items-center justify-center border border-emerald-500/30">
-                          <span className="text-xs text-emerald-400 font-medium">{index + 1}</span>
+                          <span className="text-xs text-emerald-400 font-medium">{startIndex + index + 1}</span>
                         </div>
                       </div>
                     </td>
@@ -158,7 +322,7 @@ export default function TransaksiMasuk() {
                         <div className="w-8 h-8 bg-emerald-500/20 rounded-lg flex items-center justify-center border border-emerald-500/30">
                           <Package className="w-4 h-4 text-emerald-400" />
                         </div>
-                        <span className="font-medium text-white">{item.barang}</span>
+                        <span className="font-medium text-white">{item.barang?.nama_barang ? `${item.barang.nama_barang} (${item.barang.merk || 'Unknown'})` : 'Unknown'}</span>
                       </div>
                     </td>
                     <td className="px-6 py-4">
@@ -167,23 +331,69 @@ export default function TransaksiMasuk() {
                         +{item.jumlah}
                       </span>
                     </td>
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-2">
-                        <Truck className="w-4 h-4 text-blue-400" />
-                        <span className="text-gray-300">{item.supplier}</span>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-2">
-                        <CheckCircle className="w-4 h-4 text-gray-500" />
-                        <span className="text-gray-400">{item.keterangan}</span>
-                      </div>
-                    </td>
+                    <td className="px-6 py-4 text-gray-300">{item.supplier?.nama || 'Unknown'}</td>
+                    <td className="px-6 py-4 text-gray-300">{item.keterangan || '-'}</td>
                   </motion.tr>
                 ))}
               </AnimatePresence>
             </tbody>
           </table>
+        </div>
+
+        {/* Pagination Controls - Always show */}
+        <div className="px-6 py-4 border-t border-gray-700 flex items-center justify-between">
+          <div className="text-sm text-gray-400">
+            Menampilkan {startIndex + 1} - {Math.min(endIndex, filteredTransaksi.length)} dari {filteredTransaksi.length} data
+          </div>
+          <div className="flex items-center gap-2">
+            <motion.button
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+              disabled={currentPage === 1}
+              className="p-2 rounded-lg bg-gray-700 text-gray-300 hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed border border-gray-600"
+            >
+              <ChevronLeft className="w-5 h-5" />
+            </motion.button>
+            <div className="flex items-center gap-1">
+              {Array.from({ length: Math.min(5, Math.max(1, totalPages)) }, (_, i) => {
+                let pageNum;
+                if (totalPages <= 5) {
+                  pageNum = i + 1;
+                } else if (currentPage <= 3) {
+                  pageNum = i + 1;
+                } else if (currentPage >= totalPages - 2) {
+                  pageNum = totalPages - 4 + i;
+                } else {
+                  pageNum = currentPage - 2 + i;
+                }
+                return (
+                  <motion.button
+                    key={pageNum}
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                    onClick={() => setCurrentPage(pageNum)}
+                    className={`w-10 h-10 rounded-lg border ${
+                      currentPage === pageNum
+                        ? 'bg-emerald-500 text-white border-emerald-500'
+                        : 'bg-gray-700 text-gray-300 border-gray-600 hover:bg-gray-600'
+                    }`}
+                  >
+                    {pageNum}
+                  </motion.button>
+                );
+              })}
+            </div>
+            <motion.button
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              onClick={() => setCurrentPage(prev => Math.min(Math.max(1, totalPages), prev + 1))}
+              disabled={currentPage === totalPages || totalPages <= 1}
+              className="p-2 rounded-lg bg-gray-700 text-gray-300 hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed border border-gray-600"
+            >
+              <ChevronRight className="w-5 h-5" />
+            </motion.button>
+          </div>
         </div>
       </motion.div>
 
@@ -230,17 +440,16 @@ export default function TransaksiMasuk() {
                       Nama Barang
                     </label>
                     <select
-                      value={formData.barang || ''}
-                      onChange={(e) => setFormData({ ...formData, barang: e.target.value })}
+                      value={formData.barang_id || ''}
+                      onChange={(e) => setFormData({ ...formData, barang_id: e.target.value ? parseInt(e.target.value) : undefined })}
                       className="w-full px-4 py-2 border border-gray-600 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 bg-gray-700 text-white"
-                      required
                     >
                       <option value="">Pilih Barang</option>
-                      <option value="Koko Rabbani Premium">Koko Rabbani Premium</option>
-                      <option value="Koko Al-Madinah Classic">Koko Al-Madinah Classic</option>
-                      <option value="Koko Dannis Executive">Koko Dannis Executive</option>
-                      <option value="Koko Ethica Modern">Koko Ethica Modern</option>
-                      <option value="Koko Shafira Elegant">Koko Shafira Elegant</option>
+                      {barangList.map((barang) => (
+                        <option key={barang.id} value={barang.id}>
+                          {barang.nama_barang} {barang.merk}
+                        </option>
+                      ))}
                     </select>
                   </div>
                   <div>
@@ -248,11 +457,10 @@ export default function TransaksiMasuk() {
                     <input
                       type="number"
                       value={formData.jumlah || ''}
-                      onChange={(e) => setFormData({ ...formData, jumlah: parseInt(e.target.value) })}
+                      onChange={(e) => setFormData({ ...formData, jumlah: e.target.value ? parseInt(e.target.value) : 0 })}
                       className="w-full px-4 py-2 border border-gray-600 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 bg-gray-700 text-white"
                       placeholder="0"
                       min="1"
-                      required
                     />
                   </div>
                   <div>
@@ -261,17 +469,15 @@ export default function TransaksiMasuk() {
                       Supplier
                     </label>
                     <select
-                      value={formData.supplier || ''}
-                      onChange={(e) => setFormData({ ...formData, supplier: e.target.value })}
+                      value={formData.supplier_id || ''}
+                      onChange={(e) => setFormData({ ...formData, supplier_id: e.target.value ? parseInt(e.target.value) : undefined })}
                       className="w-full px-4 py-2 border border-gray-600 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 bg-gray-700 text-white"
-                      required
                     >
                       <option value="">Pilih Supplier</option>
-                      <option value="PT Rabbani Textile">PT Rabbani Textile</option>
-                      <option value="CV Al-Madinah Fashion">CV Al-Madinah Fashion</option>
-                      <option value="UD Dannis Collection">UD Dannis Collection</option>
-                      <option value="Toko Ethica Pusat">Toko Ethica Pusat</option>
-                      <option value="PT Shafira Karya">PT Shafira Karya</option>
+                      <option value="1">PT Rabbani Textile</option>
+                      <option value="2">CV Al-Madinah Fashion</option>
+                      <option value="3">UD Dannis Collection</option>
+                      <option value="4">Toko Ethica Pusat</option>
                     </select>
                   </div>
                 </div>
@@ -288,19 +494,36 @@ export default function TransaksiMasuk() {
 
                 <div className="flex gap-3 pt-4">
                   <motion.button
-                    whileHover={{ scale: 1.02 }}
-                    whileTap={{ scale: 0.98 }}
+                    whileHover={!isSubmitting ? { scale: 1.02 } : {}}
+                    whileTap={!isSubmitting ? { scale: 0.98 } : {}}
                     type="submit"
-                    className="flex-1 bg-gradient-to-r from-emerald-500 to-emerald-600 text-white py-3 rounded-lg font-medium shadow-lg shadow-emerald-500/30 hover:shadow-xl transition-all"
+                    disabled={isSubmitting}
+                    className={`flex-1 py-3 rounded-lg font-medium shadow-lg transition-all flex items-center justify-center gap-2 ${
+                      isSubmitting 
+                        ? 'bg-gray-600 text-gray-300 cursor-not-allowed' 
+                        : 'bg-gradient-to-r from-emerald-500 to-emerald-600 text-white shadow-emerald-500/30 hover:shadow-xl'
+                    }`}
                   >
-                    Simpan Transaksi
+                    {isSubmitting ? (
+                      <>
+                        <Loader2 className="w-5 h-5 animate-spin" />
+                        Menyimpan...
+                      </>
+                    ) : (
+                      'Simpan Transaksi'
+                    )}
                   </motion.button>
                   <motion.button
                     whileHover={{ scale: 1.02 }}
                     whileTap={{ scale: 0.98 }}
                     type="button"
                     onClick={() => setShowModal(false)}
-                    className="flex-1 bg-gray-700 text-gray-300 py-3 rounded-lg font-medium hover:bg-gray-600 transition-colors border border-gray-600"
+                    disabled={isSubmitting}
+                    className={`flex-1 py-3 rounded-lg font-medium border transition-colors ${
+                      isSubmitting
+                        ? 'bg-gray-800 text-gray-500 border-gray-700 cursor-not-allowed'
+                        : 'bg-gray-700 text-gray-300 border-gray-600 hover:bg-gray-600'
+                    }`}
                   >
                     Batal
                   </motion.button>

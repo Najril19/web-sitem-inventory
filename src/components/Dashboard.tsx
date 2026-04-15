@@ -179,8 +179,7 @@ export default function Dashboard() {
                     {index + 1}
                   </div>
                   <div>
-                    <p className="font-medium text-white">{product.nama_barang ?? product.name}</p>
-                    <p className="text-sm text-gray-400">{product.merk ?? product.brand}</p>
+                    <p className="font-medium text-white">{product.nama_barang ?? product.name} ({product.merk ?? product.brand})</p>
                   </div>
                 </div>
                 <div className="text-right">

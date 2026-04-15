@@ -1,0 +1,41 @@
+Tabel,Nama Field,Tipe Data,Panjang/Constraint,Deskripsi,Keterangan
+Users,id,INTEGER,PRIMARY KEY AUTO INCREMENT,ID unik user,Auto-increment
+Users,username,VARCHAR(50),UNIQUE NOT NULL,Username untuk login,Harus unik
+Users,password,VARCHAR(255),NOT NULL,Password user,Di-hash (bcrypt)
+Users,full_name,VARCHAR(100),,Nama lengkap user,
+Users,role,VARCHAR(20),,Role user (admin/staff),Default: staff
+Users,created_at,TIMESTAMP,,Waktu dibuat,Auto-generated
+Users,updated_at,TIMESTAMP,,Waktu diupdate,Auto-generated
+Supplier,id,INTEGER,PRIMARY KEY AUTO INCREMENT,ID unik supplier,Auto-increment
+Supplier,nama,VARCHAR(100),NOT NULL,Nama supplier,
+Supplier,kontak,VARCHAR(50),,Nomor kontak/telepon,
+Supplier,alamat,TEXT,,Alamat supplier,
+Supplier,keterangan,TEXT,,Keterangan tambahan,
+Supplier,created_at,TIMESTAMP,,Waktu dibuat,Auto-generated
+Supplier,updated_at,TIMESTAMP,,Waktu diupdate,Auto-generated
+Barang,id,INTEGER,PRIMARY KEY AUTO INCREMENT,ID unik barang,Auto-increment
+Barang,kode_barang,VARCHAR(50),UNIQUE NOT NULL,Kode barang,Harus unik
+Barang,nama_barang,VARCHAR(100),NOT NULL,Nama barang,
+Barang,merk,VARCHAR(50),,Merek barang,
+Barang,kategori,VARCHAR(50),,Kategori barang,
+Barang,stok,INTEGER,DEFAULT 0,Jumlah stok,Tidak boleh negatif
+Barang,harga_beli,INTEGER,,Harga beli per satuan,Dalam Rupiah
+Barang,harga_jual,INTEGER,,Harga jual per satuan,Dalam Rupiah
+Barang,satuan,VARCHAR(20),,Satuan (pcs/lusin/dll),Default: pcs
+Barang,keterangan,TEXT,,Keterangan tambahan,
+Barang,created_at,TIMESTAMP,,Waktu dibuat,Auto-generated
+Barang,updated_at,TIMESTAMP,,Waktu diupdate,Auto-generated
+Transaksi_Masuk,id,INTEGER,PRIMARY KEY AUTO INCREMENT,ID unik transaksi,Auto-increment
+Transaksi_Masuk,tanggal,DATE,NOT NULL,Tanggal transaksi,
+Transaksi_Masuk,barang_id,INTEGER,FOREIGN KEY,ID barang,Referensi ke tabel Barang
+Transaksi_Masuk,supplier_id,INTEGER,FOREIGN KEY,ID supplier,Referensi ke tabel Supplier
+Transaksi_Masuk,jumlah,INTEGER,NOT NULL,Jumlah barang masuk,Harus positif
+Transaksi_Masuk,keterangan,TEXT,,Keterangan transaksi,
+Transaksi_Masuk,created_at,TIMESTAMP,,Waktu dibuat,Auto-generated
+Transaksi_Keluar,id,INTEGER,PRIMARY KEY AUTO INCREMENT,ID unik transaksi,Auto-increment
+Transaksi_Keluar,tanggal,DATE,NOT NULL,Tanggal transaksi,
+Transaksi_Keluar,barang_id,INTEGER,FOREIGN KEY,ID barang,Referensi ke tabel Barang
+Transaksi_Keluar,jumlah,INTEGER,NOT NULL,Jumlah barang keluar,Harus positif
+Transaksi_Keluar,tujuan,VARCHAR(100),,Tujuan pengiriman,Contoh: Penjualan Toko, Online
+Transaksi_Keluar,keterangan,TEXT,,Keterangan transaksi,
+Transaksi_Keluar,created_at,TIMESTAMP,,Waktu dibuat,Auto-generated

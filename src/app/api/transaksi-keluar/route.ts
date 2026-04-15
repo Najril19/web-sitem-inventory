@@ -23,7 +23,7 @@ export async function GET(request: NextRequest) {
         tujuan,
         keterangan,
         created_at,
-        barang:barang_id(id, nama_barang, kode_barang)
+        barang:barang_id(id, nama_barang, kode_barang, merk)
       `)
       .order('tanggal', { ascending: false })
       .order('created_at', { ascending: false });
@@ -63,9 +63,9 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const { tanggal, barang_id, jumlah, tujuan, keterangan } = body;
 
-    if (!tanggal || !barang_id || !jumlah || !tujuan) {
+    if (!barang_id || !jumlah) {
       return NextResponse.json(
-        { error: 'Tanggal, barang, jumlah, dan tujuan harus diisi' },
+        { error: 'Barang dan jumlah harus diisi' },
         { status: 400 }
       );
     }
@@ -93,10 +93,10 @@ export async function POST(request: NextRequest) {
     const { data: newTransaksi, error: insertError } = await supabase
       .from('transaksi_keluar')
       .insert({
-        tanggal,
+        tanggal: tanggal || new Date().toISOString().split('T')[0],
         barang_id,
         jumlah,
-        tujuan,
+        tujuan: tujuan || 'Lainnya',
         keterangan: keterangan || null,
         created_by: user.id,
       })
